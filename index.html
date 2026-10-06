@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>DUSLO Truck Navigation V3</title>
+<title>DUSLO Truck Navigation V4</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#eef1f4;color:#17202a}
 header{background:#16324f;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
@@ -40,9 +40,28 @@ function showPosition(p){
  coordsEl.textContent='GPS: '+lat.toFixed(6)+', '+lon.toFixed(6)+' • ±'+Math.round(accuracy)+' m';
  status.textContent=slovak?'GPS je aktívne':'GPS active';
  dot.style.display='block';acc.style.display='block';
- dot.style.left=(map.clientWidth/2)+'px';dot.style.top=(map.clientHeight/2)+'px';
+ // First geographic calibration of the DUSLO schematic map.
+ // Control points are GPS -> image pixels on the accepted map (1572 x 1001).
+ const controls=[
+   {lat:48.186372,lon:17.929864,x:190,y:150}, // Gate 1
+   {lat:48.187794,lon:17.930957,x:340,y:150}, // Gate 2
+   {lat:48.173197,lon:17.947706,x:1510,y:850}  // Gate 3
+ ];
+ const det=(controls[0].lon*(controls[1].lat-controls[2].lat)+controls[1].lon*(controls[2].lat-controls[0].lat)+controls[2].lon*(controls[0].lat-controls[1].lat));
+ const affine=(key)=>{
+   const x1=controls[0][key],x2=controls[1][key],x3=controls[2][key];
+   const a=(x1*(controls[1].lat-controls[2].lat)+x2*(controls[2].lat-controls[0].lat)+x3*(controls[0].lat-controls[1].lat))/det;
+   const b=(x1*(controls[2].lon-controls[1].lon)+x2*(controls[0].lon-controls[2].lon)+x3*(controls[1].lon-controls[0].lon))/det;
+   const c=(x1*(controls[1].lon*controls[2].lat-controls[2].lon*controls[1].lat)+x2*(controls[2].lon*controls[0].lat-controls[0].lon*controls[2].lat)+x3*(controls[0].lon*controls[1].lat-controls[1].lon*controls[0].lat))/det;
+   return [a,b,c];
+ };
+ const cx=affine('x'),cy=affine('y');
+ const mapX=cx[0]*lon+cx[1]*lat+cx[2];
+ const mapY=cy[0]*lon+cy[1]*lat+cy[2];
+ const sx=map.clientWidth/map.naturalWidth, sy=map.clientHeight/map.naturalHeight;
+ dot.style.left=(mapX*sx)+'px';dot.style.top=(mapY*sy)+'px';
  acc.style.left=dot.style.left;acc.style.top=dot.style.top;
- const px=Math.max(20,Math.min(160,accuracy));acc.style.width=px+'px';acc.style.height=px+'px';
+ const px=Math.max(20,Math.min(160,accuracy*sx));acc.style.width=px+'px';acc.style.height=px+'px';
 }
 function gpsError(e){status.textContent=(slovak?'GPS chyba: ':'GPS error: ')+e.message;}
 document.getElementById('gps').onclick=()=>{
